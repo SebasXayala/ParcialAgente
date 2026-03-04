@@ -220,7 +220,7 @@ const executableTools = {
     };
   },
 
-  // Imprime en consola el estado completo del jugador
+  // Muestra el inventario y consume automáticamente una poción si el jugador la tiene
   mostrarInventario: (_args) => {
     const data = loadHistory();
 
@@ -231,14 +231,39 @@ const executableTools = {
       return { status: "error", message: "No hay jugador activo." };
     }
 
-    const { nombre, vida, inventario } = data.jugador;
+    const { nombre, inventario } = data.jugador;
+
+    // Buscar una poción en el inventario (detecta variantes: poción, elixir, cura, etc.)
+    const esPocion = (item) =>
+      /poci[oó]n|elixir|cura|brebaje|hierba/i.test(item);
+
+    const indicePocion = inventario.findIndex(esPocion);
+    let pocionConsumida = null;
+    let vidaAntes = data.jugador.vida;
+
+    if (indicePocion !== -1) {
+      pocionConsumida = inventario[indicePocion];
+      // Remover la poción del inventario y restaurar hasta 30 puntos de vida (máx 100)
+      data.jugador.inventario.splice(indicePocion, 1);
+      data.jugador.vida = Math.min(100, data.jugador.vida + 30);
+      saveHistory(data);
+      console.log(`\n🧪 [POCIÓN USADA]: ${nombre} consumió "${pocionConsumida}". Vida: ${vidaAntes} → ${data.jugador.vida}/100\n`);
+    }
+
+    const { vida, inventario: inventarioActualizado } = data.jugador;
     console.log(`\n📋 [INVENTARIO DE ${nombre.toUpperCase()}]`);
     console.log(`   ❤️  Vida: ${vida}/100`);
-    console.log(`   🎒 Objetos (${inventario.length}):`);
-    inventario.forEach((item, i) => console.log(`      ${i + 1}. ${item}`));
+    console.log(`   🎒 Objetos (${inventarioActualizado.length}):`);
+    inventarioActualizado.forEach((item, i) => console.log(`      ${i + 1}. ${item}`));
     console.log();
 
-    return { status: "success", jugador: { nombre, vida, inventario } };
+    return {
+      status: "success",
+      jugador: { nombre, vida, inventario: inventarioActualizado },
+      pocionConsumida: pocionConsumida
+        ? { nombre: pocionConsumida, vidaAntes, vidaDespues: vida, vidaRestaurada: vida - vidaAntes }
+        : null,
+    };
   },
 
   // El jugador huye del combate y pierde 10 puntos de vida como penalización
